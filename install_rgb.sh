@@ -2,7 +2,7 @@
 
 cd /tmp/
 
-git clone https://github.com/slimbook/keyboard.git
+git clone --branch personal --single-branch https://github.com/slimbook/keyboard.git
 
 cd keyboard/backlight/essential/rgb-module/module/
 

@@ -25,7 +25,7 @@ Dependencies:
 
       Open a terminal and:
 
-      wget https://raw.githubusercontent.com/slimbook/keyboard/main/install_rgb.sh
+      wget https://raw.githubusercontent.com/Gogotron/keyboard/personal/install_rgb.sh
 
       sudo bash ./install_rgb.sh
 
