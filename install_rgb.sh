@@ -10,7 +10,7 @@ sudo apt install gcc make build-essential
 
 make && sudo make install
 
-sudo insmod clevo-xsm-wmi.ko
+sudo insmod clevo-xsm-wmi.ko || (sudo rmmod clevo-xsm-wmi; sudo insmod clevo-xsm-wmi.ko)
 
 sudo install -m644 clevo-xsm-wmi.ko /lib/modules/$(uname -r)/extra
 
