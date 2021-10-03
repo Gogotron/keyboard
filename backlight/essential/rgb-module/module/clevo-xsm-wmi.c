@@ -493,6 +493,7 @@ static struct {
 		void (*set_state)(enum kb_state state);
 		void (*set_color)(unsigned left, unsigned center,
 			unsigned right, unsigned extra);
+		void (*set_custom_color)(unsigned left, unsigned center, unsigned right, unsigned extra);
 		void (*set_brightness)(unsigned brightness);
 		void (*set_mode)(enum kb_mode);
 		void (*init)(void);
@@ -630,6 +631,51 @@ static void kb_full_color__set_color(unsigned left, unsigned center,
 	kb_backlight.mode = KB_MODE_CUSTOM;
 }
 
+static void kb_full_color__set_custom_color(unsigned left, unsigned center,
+	unsigned right, unsigned extra)
+{
+	union kb_rgb_color left_color = (union kb_rgb_color) left;
+	union kb_rgb_color center_color = (union kb_rgb_color) center;
+	union kb_rgb_color right_color = (union kb_rgb_color) right;
+
+	u32 cmd;
+
+	cmd = 0xF0000000;
+	cmd |= left_color.b << 16;
+	cmd |= left_color.r <<  8;
+	cmd |= left_color.g <<  0;
+
+	clevo_xsm_wmi_evaluate_wmbb_method(SET_KB_LED, cmd, NULL);
+
+	cmd = 0xF1000000;
+	cmd |= center_color.b << 16;
+	cmd |= center_color.r <<  8;
+	cmd |= center_color.g <<  0;
+
+	clevo_xsm_wmi_evaluate_wmbb_method(SET_KB_LED, cmd, NULL);
+
+	cmd = 0xF2000000;
+	cmd |= right_color.b << 16;
+	cmd |= right_color.r <<  8;
+	cmd |= right_color.g <<  0;
+
+	clevo_xsm_wmi_evaluate_wmbb_method(SET_KB_LED, cmd, NULL);
+
+	if (kb_backlight.extra == KB_HAS_EXTRA_TRUE) {
+		union kb_rgb_color extra_color = (union kb_rgb_color) extra;
+
+		cmd = 0xF3000000;
+		cmd |= extra_color.b << 16;
+		cmd |= extra_color.r << 8;
+		cmd |= extra_color.g << 0;
+
+		clevo_xsm_wmi_evaluate_wmbb_method(SET_KB_LED, cmd, NULL);
+	}
+
+	kb_backlight.mode = KB_MODE_CUSTOM;
+}
+
+
 static void kb_full_color__precompute_brightness_levels(unsigned steps, u8 *lvl_arr) {
 	static bool precomputed = false;
 
@@ -764,6 +810,7 @@ static void kb_full_color__init(void)
 static struct kb_backlight_ops kb_full_color_ops = {
 	.set_state      = kb_full_color__set_state,
 	.set_color      = kb_full_color__set_color,
+	.set_custom_color = kb_full_color__set_custom_color,
 	.set_brightness = kb_full_color__set_brightness,
 	.set_mode       = kb_full_color__set_mode,
 	.init           = kb_full_color__init,
@@ -784,6 +831,7 @@ static void kb_full_color__init_extra(void)
 static struct kb_backlight_ops kb_full_color_with_extra_ops = {
 	.set_state      = kb_full_color__set_state,
 	.set_color      = kb_full_color__set_color,
+	.set_custom_color = kb_full_color__set_custom_color,
 	.set_brightness = kb_full_color__set_brightness,
 	.set_mode       = kb_full_color__set_mode,
 	.init           = kb_full_color__init_extra,
@@ -900,6 +948,7 @@ static void kb_8_color__init(void)
 static struct kb_backlight_ops kb_8_color_ops = {
 	.set_state      = kb_8_color__set_state,
 	.set_color      = kb_8_color__set_color,
+	.set_custom_color = kb_8_color__set_color,
 	.set_brightness = kb_8_color__set_brightness,
 	.set_mode       = kb_8_color__set_mode,
 	.init           = kb_8_color__init,
@@ -1201,6 +1250,12 @@ static ssize_t clevo_xsm_color_store(struct device *child,
 	char right[8];
 	char center[8];
 	char extra[8];
+	long left_color;
+	long center_color;
+	long right_color;
+	long extra_color;
+
+	char valid_hex[] = "0123456789abcdefABCDEF";
 
 	if (!kb_backlight.ops)
 		return -EINVAL;
@@ -1208,6 +1263,12 @@ static ssize_t clevo_xsm_color_store(struct device *child,
 	i = sscanf(buf, "%7s %7s %7s %7s", left, center, right, extra);
 
 	if (i == 1) {
+		if (left[strspn(left, valid_hex)] == 0) {
+			kstrtol(left, 16, &left_color);
+			kb_backlight.ops->set_custom_color(left_color, left_color, left_color, left_color);
+			
+			return size;
+		}
 		for (j = 0; j < ARRAY_SIZE(kb_colors); j++) {
 			if (!strcmp(left, kb_colors[j].name))
 				val[0] = j;
@@ -1216,6 +1277,15 @@ static ssize_t clevo_xsm_color_store(struct device *child,
 		val[3] = val[2] = val[1] = val[0];
 
 	} else if (i == 3 || i == 4) {
+		if (left[strspn(left, valid_hex)] == 0 && center[strspn(center, valid_hex)] == 0 && right[strspn(right, valid_hex)] == 0) {
+			kstrtol(left, 16, &left_color);
+			kstrtol(center, 16, &center_color);
+			kstrtol(right, 16, &right_color);
+			kstrtol(extra, 16, &extra_color);
+			kb_backlight.ops->set_custom_color(left_color, center_color, right_color, extra_color);
+			
+			return size;
+		}
 		for (j = 0; j < ARRAY_SIZE(kb_colors); j++) {
 			if (!strcmp(left, kb_colors[j].name))
 				val[0] = j;
